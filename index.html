@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Daily Slide</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; cursor: none; }
+  iframe { position: absolute; left: 0; width: 100vw; border: 0; pointer-events: none; }
+  img { width: 100vw; height: 100vh; object-fit: contain; display: block; }
+  #debug { position: fixed; top: 8px; left: 8px; z-index: 2; color: #fff; font: 16px sans-serif;
+           background: rgba(0,0,0,.7); padding: 6px 10px; border-radius: 4px; }
+</style>
+</head>
+<body>
+<script src="config.js"></script>
+<script src="picker.js"></script>
+<script>
+(function () {
+  var cfg = window.DAILY_SLIDE_CONFIG;
+  var DS = window.DailySlide;
+  var params = new URLSearchParams(location.search);
+
+  // Testing: ?date=2026-11-10 previews any day; ?debug shows which deck and slide were picked.
+  var today = new Date();
+  if (params.get("date")) today = DS.parse(params.get("date"));
+
+  var hit = DS.pickToday(cfg, today);
+  var url = null, slide = null, image = null;
+
+  if (hit) {
+    url = hit.deck.canvaUrl; slide = hit.slide;
+  } else if (typeof cfg.offDayShows === "number" && cfg.offDayShows > 0) {
+    var deck = DS.currentDeck(cfg, today);
+    if (deck) { url = deck.canvaUrl; slide = Math.min(cfg.offDayShows, deck.slideCount); }
+  } else if (typeof cfg.offDayShows === "string" && cfg.offDayShows) {
+    image = cfg.offDayShows;
+  }
+
+  if (url) {
+    // A Canva view link opens on a given slide when "#<number>" is added to the end.
+    var base = url.split("#")[0].split("?")[0];
+    var frame = document.createElement("iframe");
+    frame.src = base + "?embed#" + slide;
+    frame.allow = "autoplay; fullscreen";
+    // Make the frame taller than the screen and centre it, so the slide still fills the
+    // screen while Canva's bottom play bar sits off-screen.
+    var extra = cfg.hideControlsPx || 0;
+    frame.style.top = (-extra) + "px";
+    frame.style.height = "calc(100vh + " + (extra * 2) + "px)";
+    document.body.appendChild(frame);
+  } else if (image) {
+    var img = document.createElement("img");
+    img.src = image;
+    document.body.appendChild(img);
+  }
+
+  if (params.has("debug")) {
+    var d = document.createElement("div");
+    d.id = "debug";
+    d.textContent = today.toDateString() + " → " +
+      (hit ? hit.deck.name + ", slide " + hit.slide + " of " + hit.deck.slideCount : "Off day / nothing scheduled");
+    document.body.appendChild(d);
+  }
+
+  // Screens often stay on for days: reload after midnight so the next slide appears.
+  if (!params.get("date")) {
+    var startDay = new Date().getDate();
+    setInterval(function () { if (new Date().getDate() !== startDay) location.reload(); }, 60000);
+  }
+})();
+</script>
+</body>
+</html>
